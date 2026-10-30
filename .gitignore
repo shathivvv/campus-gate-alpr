@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets / local config
+.env
+
+# Recorded footage and datasets (too large for git; keep them local or on Drive)
+videos/
+*.mp4
+*.avi
+*.mov
+*.mkv
+datasets/
+
+# Ultralytics / Paddle run outputs
+runs/
+output/
