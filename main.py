@@ -4,15 +4,16 @@ import gradio as gr
 import pandas as pd
 from datetime import datetime
 from ultralytics import YOLO
-from paddleocr import PaddleOCR
+import config
 from db_handler import DatabaseHandler
+from plate_reader import create_ocr, crop_plate, read_plate
 
 # 1. Initialize Models & Database
 print("Loading YOLO model...")
-yolo_model = YOLO("best (1).pt") 
+yolo_model = YOLO(config.MODEL_PATH)
 
 print("Loading PaddleOCR...")
-ocr = PaddleOCR(lang='en')
+ocr = create_ocr()
 
 print("Connecting to Database...")
 db = DatabaseHandler()
@@ -39,19 +40,14 @@ def process_pipeline(img):
     x1, y1, x2, y2 = box
     
     # 3. Crop and Annotate
-    plate_crop = img[y1:y2, x1:x2]
+    plate_crop = crop_plate(img, box)
     annotated_img = img.copy()
     cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 3)
     cv2.putText(annotated_img, f"Plate {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
     
     # 4. Run PaddleOCR
-    ocr_generator = ocr.predict(plate_crop)
-    ocr_results = list(ocr_generator)
-    
-    clean_text = "UNKNOWN"
-    if len(ocr_results) > 0 and len(ocr_results[0].get('rec_texts', [])) > 0:
-        raw_text = ocr_results[0]['rec_texts'][0]
-        clean_text = raw_text.replace(" ", "").upper()
+    reading = read_plate(ocr, plate_crop) if plate_crop is not None else None
+    clean_text = reading[0] if reading else "UNKNOWN"
     
     # 5. Database Authorization & Greeting Logic
     if clean_text == "UNKNOWN":
