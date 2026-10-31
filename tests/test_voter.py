@@ -1,4 +1,4 @@
-from voter import PlateVoter
+from voter import PlateVoter, is_near_duplicate
 
 
 def test_confirms_after_enough_matching_reads():
@@ -30,3 +30,19 @@ def test_same_plate_not_logged_again_during_cooldown():
     assert voter.add("WA1234B", 0.9, now=0.0) is not None
     assert voter.add("WA1234B", 0.9, now=5.0) is None
     assert voter.add("WA1234B", 0.9, now=20.0) is not None
+
+
+def test_partial_misread_of_logged_plate_is_ignored():
+    voter = PlateVoter(min_votes=1, cooldown=15.0)
+    assert voter.add("WA1234B", 0.9, now=0.0) is not None
+    assert voter.add("A1234B", 0.9, now=1.0) is None   # missing first letter
+    assert voter.add("NA1234B", 0.9, now=2.0) is None  # one letter wrong
+    assert voter.add("VCD123", 0.9, now=3.0) is not None  # a different car
+
+
+def test_near_duplicate():
+    assert is_near_duplicate("WA1234B", "A1234B")
+    assert is_near_duplicate("BKL5678C", "BKI5678C")
+    assert is_near_duplicate("JQR905", "JQR9105")
+    assert not is_near_duplicate("BKL5678C", "PLM4321")
+    assert not is_near_duplicate("ABC1234", "ABC9934")

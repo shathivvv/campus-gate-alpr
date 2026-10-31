@@ -69,16 +69,23 @@ python -m pytest tests
 **Accuracy:** 13.5 minutes of 4K daytime footage recorded at the Faculty of Computing,
 44 vehicles approaching the camera, each checked against the plate read by eye.
 
-| Measure | Result |
-|---|---|
-| Plate detected on the vehicle | 44 / 44 (100%) |
-| Exact plate logged correctly | 37 / 44 (84%) |
-| Wrong plate logged | 1 |
-| Extra entries from partial reads | 3 |
+| Measure | v1 | v2 (current) |
+|---|---|---|
+| Plate detected on the vehicle | 44 / 44 (100%) | 44 / 44 (100%) |
+| Exact plate logged correctly | 37 / 44 (84%) | **39 / 44 (89%)** |
+| Wrong plates logged | 4 | **1** |
 
-Failures: two-line plates (0/2, only one line read), thin characters dropped or confused
-(a narrow `1` dropped, `Q` read as `O`), and vehicles that gave fewer than 3 reads
-(a fast car, a bus with a small high plate).
+What changed in v2, and why:
+- **Two-line plates** (0/2 -> 2/2): PaddleOCR's text detector found only one of the two lines,
+  so near-square plate crops are now read as separate top and bottom halves.
+- **Partial-read duplicates** (3 -> 0): after logging `WA1234B` the system also logged `A1234B`.
+  A plate that is contained in, or one character away from, a plate logged in the last 15 s
+  is now treated as the same car.
+- **Tried and rejected:** confirming a plate after 2 matching reads instead of 3. It rescued
+  one more vehicle but logged 4 more wrong plates, so it stays at 3.
+
+Remaining misses: a narrow `1` dropped (one wrong plate), `Q` read as `O`, a car that passed
+too quickly for 3 reads, and a bus whose plate is small and mounted high.
 
 **Speed:**
 
@@ -88,17 +95,21 @@ Failures: two-line plates (0/2, only one line read), thin characters dropped or 
 | OCR per plate, mobile models (used) | ~0.12 s |
 | Dashboard on 1080p video | ~6 frames/s shown, real-time playback |
 
-To re-run the evaluation on a video:
+To re-run the evaluation:
 
 ```bash
+# 1. Detect plates once (slow on long 4K video); saves every plate crop
 python scan_video.py videos/gate_entry.mp4 --sample-fps 10
+
+# 2. OCR + voting + scoring against an answer key (a few minutes; re-run after any change)
+python evaluate.py runs/scan_gate_entry --truth eval/ground_truth_gate_entry.csv
 ```
 
-This writes `runs/scan_<video>/events.csv` (one row per vehicle) and a plate crop per vehicle.
+The answer key is a CSV with `time_s` and `true_plate` per vehicle. It holds real people's
+plate numbers, so `eval/` is kept out of git.
 
 ## Known limitations / next steps
 
 - Only the most confident plate in a frame is read, which fits a single-lane gate.
 - Votes are grouped by text, not by vehicle. Object tracking (e.g. ByteTrack) would tie reads to one car.
-- Two-line plates aren't read correctly yet (next fix).
 - Only tested on daytime footage; night, rain and steep angles are untested.

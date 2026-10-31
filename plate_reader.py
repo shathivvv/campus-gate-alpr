@@ -7,6 +7,7 @@ import config
 
 # Malaysian standard plate: 1-3 letters, 1-4 digits, optional trailing letter (e.g. WA1234B, BJT8558)
 PLATE_PATTERN = re.compile(r"^[A-Z]{1,3}\d{1,4}[A-Z]?$")
+TWO_LINE_MAX_ASPECT = 1.7
 
 
 def create_ocr():
@@ -50,8 +51,38 @@ def normalize(text):
     return re.sub(r"[^A-Z0-9]", "", text.upper())
 
 
+def is_two_line(plate_crop):
+    """Two-line plates are nearly square (width/height ~1.2); single-line ones are 2+."""
+    if plate_crop is None:
+        return False
+    h, w = plate_crop.shape[:2]
+    return w / h < TWO_LINE_MAX_ASPECT
+
+
 def read_plate(ocr, plate_crop):
     """Runs OCR on a plate crop. Returns (plate_text, ocr_confidence) or None if no valid plate."""
+    if is_two_line(plate_crop):
+        return read_two_line(ocr, plate_crop) or read_lines(ocr, plate_crop)
+    return read_lines(ocr, plate_crop)
+
+
+def read_two_line(ocr, plate_crop):
+    """PaddleOCR's text detector often finds only one line of a two-line plate,
+    so read the top and bottom halves separately (with a small overlap) and join them."""
+    h = plate_crop.shape[0]
+    top = read_lines(ocr, plate_crop[: int(h * 0.55)], validate=False)
+    bottom = read_lines(ocr, plate_crop[int(h * 0.45):], validate=False)
+    if not top or not bottom:
+        return None
+    plate = top[0] + bottom[0]
+    if not PLATE_PATTERN.match(plate):
+        return None
+    return plate, min(top[1], bottom[1])
+
+
+def read_lines(ocr, plate_crop, validate=True):
+    """OCRs every text line in the crop. With validate=False, returns the joined
+    (normalized) text without checking it against the plate format."""
     results = list(ocr.predict(plate_crop))
     if not results:
         return None
@@ -59,8 +90,10 @@ def read_plate(ocr, plate_crop):
     scores = list(results[0].get("rec_scores", []))
     if not texts:
         return None
+    if not validate:
+        return normalize("".join(texts)), float(min(scores, default=0.0))
 
-    # Two-line plates come back as two text lines, so try them joined first,
+    # Two-line plates can come back as two text lines, so try them joined first,
     # then each line alone (in case one line is a sticker or dealer badge).
     candidates = [("".join(texts), min(scores, default=0.0))]
     candidates += [(t, s) for t, s in zip(texts, scores)]

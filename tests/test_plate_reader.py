@@ -40,3 +40,28 @@ def test_crop_is_clipped_to_frame_and_keeps_aspect_ratio():
 def test_tiny_box_is_ignored():
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     assert crop_plate(frame, (10, 10, 12, 12)) is None
+
+
+class HalvesOCR:
+    """Fake OCR that returns a different line for the top and bottom half of a crop."""
+
+    def __init__(self, top, bottom):
+        self.top, self.bottom = top, bottom
+
+    def predict(self, image):
+        if image[0, 0, 0] == 1 and image[-1, 0, 0] == 2:
+            return [{"rec_texts": ["CDA"], "rec_scores": [0.5]}]  # whole plate: one line only
+        text = self.top if image[0, 0, 0] == 1 else self.bottom
+        return [{"rec_texts": [text], "rec_scores": [0.9]}]
+
+
+def test_two_line_plate_is_read_in_halves():
+    crop = np.zeros((200, 240, 3), dtype=np.uint8)  # near-square, like a two-line plate
+    crop[:10] = 1    # mark the top and bottom edges so the fake OCR can tell which part it got
+    crop[-10:] = 2
+    assert read_plate(HalvesOCR("QM", "8812"), crop) == ("QM8812", 0.9)
+
+
+def test_wide_crop_is_not_split():
+    crop = np.zeros((80, 256, 3), dtype=np.uint8)
+    assert read_plate(FakeOCR(["WA1234B"], [0.9]), crop) == ("WA1234B", 0.9)

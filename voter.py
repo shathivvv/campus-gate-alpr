@@ -7,6 +7,22 @@ until the same text has been read MIN_VOTES times within a short window.
 from collections import deque
 
 
+def is_near_duplicate(a, b):
+    """True if one plate is contained in the other or they differ by one character."""
+    if a in b or b in a:
+        return True
+    if abs(len(a) - len(b)) > 1:
+        return False
+    # Edit distance <= 1 (one substitution, insertion or deletion)
+    i = 0
+    while i < min(len(a), len(b)) and a[i] == b[i]:
+        i += 1
+    if len(a) == len(b):
+        return a[i + 1:] == b[i + 1:]
+    shorter, longer = sorted((a, b), key=len)
+    return shorter[i:] == longer[i + 1:]
+
+
 class PlateVoter:
     def __init__(self, min_votes=3, window=4.0, cooldown=15.0):
         self.min_votes = min_votes
@@ -21,7 +37,9 @@ class PlateVoter:
         while self.reads and now - self.reads[0][0] > self.window:
             self.reads.popleft()
 
-        if now - self.last_logged.get(text, float("-inf")) < self.cooldown:
+        # A partial misread of a car we just logged (WA1234B -> A1234B) is the same car.
+        if any(now - logged_at < self.cooldown and is_near_duplicate(text, plate)
+               for plate, logged_at in self.last_logged.items()):
             return None
 
         scores = [s for _, t, s in self.reads if t == text]
