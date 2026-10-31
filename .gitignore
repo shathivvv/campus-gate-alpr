@@ -17,3 +17,8 @@ datasets/
 # Ultralytics / Paddle run outputs
 runs/
 output/
+.pytest_cache/
+
+# Evaluation answer keys hold real third-party plate numbers: keep local
+eval/
+*.log

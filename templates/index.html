@@ -18,7 +18,7 @@
             <!-- Left Column: Live Video Feed -->
             <div class="flex-1">
                 <div class="bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700">
-                    <h2 class="text-xl mb-4 font-semibold">Live Camera Feed</h2>
+                    <h2 class="text-xl mb-4 font-semibold">{{ source_label }}</h2>
                     <!-- This img tag continuously loads the MJPEG stream from Flask -->
                     <img src="/video_feed" class="w-full rounded border border-gray-600" alt="Live Camera Feed">
                 </div>
@@ -60,6 +60,10 @@
             fetch('/api/data')
                 .then(response => response.json())
                 .then(data => {
+                    if (data.error) {
+                        document.getElementById('status-text').innerText = data.error;
+                        return;
+                    }
                     // Update Status Banner
                     const banner = document.getElementById('status-banner');
                     const statusText = document.getElementById('status-text');
