@@ -6,7 +6,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/app.py",
-            "args": ["--source", "videos/demo_1080p.mp4", "videos/VID_*.mp4", "--loop"],
+            "args": ["--source", "videos/demo_1080p.mp4", "videos/video[2-6].mp4", "--loop"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "subProcess": true

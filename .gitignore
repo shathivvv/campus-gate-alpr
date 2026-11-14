@@ -22,3 +22,6 @@ output/
 # Evaluation answer keys hold real third-party plate numbers: keep local
 eval/
 *.log
+
+# Thesis drafts (figures show real plates): keep local
+report/
