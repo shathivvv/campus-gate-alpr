@@ -46,6 +46,10 @@ mysql -u root < schema.sql
 # Dashboard on recorded footage (put videos in videos/, which git ignores)
 python app.py --source videos/gate_entry.mp4 --loop
 
+# Several videos played one after another (folders and * patterns work too);
+# the dashboard has a "Next video" button to skip ahead
+python app.py --source videos/clip1.mp4 "videos/VID_*.mp4" --loop
+
 # Dashboard on the laptop webcam
 python app.py
 

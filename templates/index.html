@@ -18,7 +18,25 @@
             <!-- Left Column: Live Video Feed -->
             <div class="flex-1">
                 <div class="bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700">
-                    <h2 class="text-xl mb-4 font-semibold">{{ source_label }}</h2>
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <h2 id="source-label" class="text-xl font-semibold">{{ source_label }}</h2>
+                        <div class="flex gap-2 shrink-0">
+                            <input id="video-file" type="file" accept="video/*" class="hidden">
+                            <button id="upload-video" class="bg-green-600 hover:bg-green-500 disabled:opacity-50 px-4 py-2 rounded font-semibold">
+                                Upload video &#8679;
+                            </button>
+                            <button id="next-video" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-semibold">
+                                Next video &#9654;
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Upload progress, hidden until a file is chosen -->
+                    <div id="upload-status" class="hidden mb-4">
+                        <div class="w-full bg-gray-700 rounded h-2">
+                            <div id="upload-bar" class="bg-green-500 h-2 rounded" style="width: 0%"></div>
+                        </div>
+                        <p id="upload-text" class="text-sm text-gray-300 mt-1"></p>
+                    </div>
                     <!-- This img tag continuously loads the MJPEG stream from Flask -->
                     <img src="/video_feed" class="w-full rounded border border-gray-600" alt="Live Camera Feed">
                 </div>
@@ -55,6 +73,47 @@
     </div>
 
     <script>
+        document.getElementById('next-video').addEventListener('click', () => fetch('/api/next', { method: 'POST' }));
+
+        // Upload: XMLHttpRequest instead of fetch so we can show upload progress for big videos.
+        const fileInput = document.getElementById('video-file');
+        const uploadButton = document.getElementById('upload-video');
+        uploadButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+            const bar = document.getElementById('upload-bar');
+            const text = document.getElementById('upload-text');
+            document.getElementById('upload-status').classList.remove('hidden');
+            uploadButton.disabled = true;
+
+            const form = new FormData();
+            form.append('video', file);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload');
+            xhr.upload.onprogress = (e) => {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                bar.style.width = percent + '%';
+                text.innerText = `Uploading ${file.name}... ${percent}%`;
+            };
+            const finish = (message, ok) => {
+                text.innerText = message;
+                text.className = 'text-sm mt-1 ' + (ok ? 'text-gray-300' : 'text-red-400');
+                uploadButton.disabled = false;
+                fileInput.value = '';
+                if (ok) setTimeout(() => document.getElementById('upload-status').classList.add('hidden'), 4000);
+            };
+            xhr.onload = () => {
+                if (xhr.status === 200) return finish(`Playing ${file.name}`, true);
+                let error;
+                try { error = JSON.parse(xhr.responseText).error; } catch (e) { /* not JSON */ }
+                finish(`Upload failed: ${error || 'server error ' + xhr.status}`, false);
+            };
+            xhr.onerror = () => finish(
+                'Upload failed: lost connection to the dashboard. Is app.py still running?', false);
+            xhr.send(form);
+        });
+
         // Poll the Python API every 1 second to get the latest DB logs and UI status
         setInterval(() => {
             fetch('/api/data')
@@ -64,6 +123,7 @@
                         document.getElementById('status-text').innerText = data.error;
                         return;
                     }
+                    document.getElementById('source-label').innerText = data.source_label;
                     // Update Status Banner
                     const banner = document.getElementById('status-banner');
                     const statusText = document.getElementById('status-text');

@@ -1,0 +1,52 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ALPR: Demo playlist (all demo videos, one by one)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app.py",
+            "args": ["--source", "videos/demo_1080p.mp4", "videos/VID_*.mp4", "--loop"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "subProcess": true
+        },
+        {
+            "name": "ALPR: Upload mode (start empty, upload videos in the dashboard)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app.py",
+            "args": ["--source", "none"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "subProcess": true
+        },
+        {
+            "name": "ALPR: Dashboard on demo video",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app.py",
+            "args": ["--source", "videos/demo_1080p.mp4", "--loop"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "subProcess": true
+        },
+        {
+            "name": "ALPR: Dashboard on webcam",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "subProcess": true
+        },
+        {
+            "name": "ALPR: Single-image demo (Gradio)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ]
+}
