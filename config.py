@@ -26,3 +26,7 @@ DB_CONFIG = {
     "password": os.getenv("DB_PASSWORD", ""),
     "database": os.getenv("DB_NAME", "umpsa_alpr"),
 }
+
+# --- Dashboard ---
+FACULTY_NAME = os.getenv("ALPR_FACULTY_NAME", "Fakulti Komputeran")
+WELCOME_SECONDS = float(os.getenv("ALPR_WELCOME_SECONDS", "8"))  # how long the welcome banner stays up

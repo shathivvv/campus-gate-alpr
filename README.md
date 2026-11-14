@@ -26,6 +26,22 @@ video / webcam ──► YOLO plate detector ──► plate crop ──► Padd
 - **Real-time video playback:** recorded footage plays at its real speed. When detection falls
   behind, frames are skipped, just as a live gate camera would drop them.
 
+## Dashboard
+
+**Live Monitor** (`/`)
+- Welcome banner for each vehicle: *"Welcome, (owner name) / ABC1234 to Fakulti Komputeran"* in green
+  for registered vehicles, *"Welcome Visitor"* in amber otherwise. It clears after 8 seconds.
+- Today at a glance: total entries, registered, visitors, unique vehicles.
+- Live video with plate boxes, the latest entries with owner name and category, and
+  an entries-per-hour chart.
+
+**Records** (`/records`)
+- Search by plate or owner name, filter by status and date.
+- Export the filtered entries to CSV.
+
+The faculty name and banner duration are set in `config.py`
+(`ALPR_FACULTY_NAME`, `ALPR_WELCOME_SECONDS`).
+
 ## Setup
 
 ```bash
@@ -45,6 +61,10 @@ mysql -u root < schema.sql
 ```bash
 # Dashboard on recorded footage (put videos in videos/, which git ignores)
 python app.py --source videos/gate_entry.mp4 --loop
+
+# Several videos played one after another (folders and * patterns work too);
+# the dashboard has a "Next video" button to skip ahead
+python app.py --source videos/clip1.mp4 "videos/VID_*.mp4" --loop
 
 # Dashboard on the laptop webcam
 python app.py
