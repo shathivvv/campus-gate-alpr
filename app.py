@@ -6,7 +6,10 @@
     python app.py --source none                     # start empty; upload videos from the dashboard
 """
 import argparse
+import csv
+import datetime
 import glob
+import io
 import multiprocessing as mp
 import threading
 import time
@@ -209,44 +212,81 @@ def generate_video_stream():
 # --- FLASK ROUTES ---
 @app.route('/')
 def index():
-    return render_template('index.html', source_label=source_label)
+    return render_template('index.html', source_label=source_label, faculty=config.FACULTY_NAME)
 
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_video_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+def entry_json(row):
+    """One entry-log row in the shape the dashboard uses."""
+    return {
+        "plate": row["plate_number"],
+        "status": row["auth_result"],
+        "name": row["full_name"],
+        "category": row["category"],
+        "confidence": round(row["confidence"] or 0, 2),
+        "date": row["time_stamp"].strftime("%Y-%m-%d"),
+        "time": row["time_stamp"].strftime("%H:%M:%S"),
+    }
+
 @app.route('/api/data')
 def get_data():
+    """Everything the live monitor shows: welcome banner, recent entries, today's numbers."""
+    today = datetime.date.today()
     try:
-        logs = DatabaseHandler().recent_entries(5)
+        db = DatabaseHandler()
+        logs = db.recent_entries(10)
+        summary = db.day_summary(today)
+        hourly = db.hourly_counts(today)
     except Exception as e:
         return jsonify({"error": f"Database unavailable: {e}"}), 503
 
-    formatted_logs = [
-        {"plate": r["plate_number"], "status": r["auth_result"], "time": r["time_stamp"].strftime("%H:%M:%S")}
-        for r in logs
-    ]
-
-    status_text = "Scanning for vehicles..."
-    status_color = "gray"
-
-    if logs:
-        latest_log = logs[0]
-        time_diff = (time.time() - latest_log["time_stamp"].timestamp())
-        if time_diff < 8.0:
-            if latest_log["auth_result"] == "Registered":
-                status_text = f"Registered: {latest_log['plate_number']}"
-                status_color = "green"
-            else:
-                status_text = f"Visitor: {latest_log['plate_number']}"
-                status_color = "red"
+    # Show the welcome banner for the latest vehicle for a few seconds after it is logged.
+    welcome = None
+    if logs and logs[0]["seconds_ago"] is not None and logs[0]["seconds_ago"] < config.WELCOME_SECONDS:
+        welcome = entry_json(logs[0])
 
     return jsonify({
         "source_label": source_label,
-        "status_text": status_text,
-        "status_color": status_color,
-        "logs": formatted_logs
+        "faculty": config.FACULTY_NAME,
+        "welcome": welcome,
+        "logs": [entry_json(r) for r in logs],
+        "summary": summary,
+        "hourly": hourly,
     })
+
+def records_filters():
+    """Reads the search filters shared by the records table and its CSV export."""
+    day = request.args.get("date") or None
+    if day:
+        day = datetime.date.fromisoformat(day)
+    return {"text": request.args.get("q", "").strip(), "status": request.args.get("status", ""), "day": day}
+
+@app.route('/records')
+def records():
+    return render_template('records.html')
+
+@app.route('/api/records')
+def get_records():
+    try:
+        rows = DatabaseHandler().search_entries(**records_filters())
+    except ValueError:
+        return jsonify({"error": "Invalid date"}), 400
+    return jsonify({"entries": [entry_json(r) for r in rows]})
+
+@app.route('/records/export.csv')
+def export_records():
+    rows = DatabaseHandler().search_entries(**records_filters(), limit=100000)
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["Date", "Time", "Plate", "Owner", "Category", "Status", "OCR confidence"])
+    for r in map(entry_json, rows):
+        writer.writerow([r["date"], r["time"], r["plate"], r["name"] or "", r["category"] or "",
+                         r["status"], r["confidence"]])
+    filename = f"alpr_entries_{datetime.date.today()}.csv"
+    return Response(out.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 @app.route('/api/next', methods=['POST'])
 def next_video():

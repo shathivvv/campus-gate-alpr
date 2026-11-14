@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Records · UMPSA Gate ALPR{% endblock %}
+
+{% block content %}
+<section class="rounded-xl bg-slate-900 border border-slate-800 p-4 mb-4">
+    <form id="filters" class="flex flex-wrap items-end gap-3">
+        <label class="flex-1 min-w-[200px]">
+            <span class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Search plate or owner</span>
+            <input id="q" type="search" placeholder="e.g. WA1234B or Ahmad"
+                   class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 focus:outline-none focus:border-sky-500">
+        </label>
+        <label>
+            <span class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Status</span>
+            <select id="status" class="bg-slate-950 border border-slate-700 rounded px-3 py-2">
+                <option value="">All</option>
+                <option value="Registered">Registered</option>
+                <option value="Visitor">Visitor</option>
+            </select>
+        </label>
+        <label>
+            <span class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Date</span>
+            <input id="date" type="date" class="bg-slate-950 border border-slate-700 rounded px-3 py-2 [color-scheme:dark]">
+        </label>
+        <button type="button" id="clear" class="px-3 py-2 rounded text-sm font-semibold text-slate-300 hover:bg-slate-800">Clear</button>
+        <a id="export" href="/records/export.csv" class="px-3 py-2 rounded text-sm font-semibold bg-emerald-600 hover:bg-emerald-500">Export CSV &#8681;</a>
+    </form>
+</section>
+
+<section class="rounded-xl bg-slate-900 border border-slate-800">
+    <p id="count" class="px-4 pt-4 text-sm text-slate-400"></p>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+            <thead class="text-xs uppercase tracking-wide text-slate-400 border-b border-slate-800">
+                <tr>
+                    <th class="px-4 py-3">Date</th>
+                    <th class="px-4 py-3">Time</th>
+                    <th class="px-4 py-3">Plate</th>
+                    <th class="px-4 py-3">Owner</th>
+                    <th class="px-4 py-3">Category</th>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3 text-right">OCR confidence</th>
+                </tr>
+            </thead>
+            <tbody id="rows" class="divide-y divide-slate-800"></tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const fields = ['q', 'status', 'date'].map(id => document.getElementById(id));
+
+    function query() {
+        const params = new URLSearchParams();
+        fields.forEach(f => { if (f.value) params.set(f.id, f.value.trim()); });
+        return params.toString();
+    }
+
+    let latestRequest = 0;
+    async function load() {
+        const qs = query();
+        document.getElementById('export').href = '/records/export.csv' + (qs ? '?' + qs : '');
+        const request = ++latestRequest;
+        const data = await (await fetch('/api/records' + (qs ? '?' + qs : ''))).json();
+        if (request !== latestRequest) return;  // a newer search started meanwhile; drop this stale result
+        const entries = data.entries || [];
+        document.getElementById('count').textContent =
+            data.error ? data.error : `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}${entries.length === 500 ? ' (showing the latest 500; export for all)' : ''}`;
+        document.getElementById('rows').innerHTML = entries.length
+            ? entries.map(e => `
+                <tr class="hover:bg-slate-800/50">
+                    <td class="px-4 py-2.5 text-slate-400">${esc(e.date)}</td>
+                    <td class="px-4 py-2.5">${esc(e.time)}</td>
+                    <td class="px-4 py-2.5 font-mono font-bold tracking-wide">${esc(e.plate)}</td>
+                    <td class="px-4 py-2.5">${e.name ? esc(e.name) : '<span class="text-slate-500">&mdash;</span>'}</td>
+                    <td class="px-4 py-2.5 text-slate-400">${esc(e.category || '')}</td>
+                    <td class="px-4 py-2.5">${statusBadge(e.status)}</td>
+                    <td class="px-4 py-2.5 text-right text-slate-400">${Math.round(e.confidence * 100)}%</td>
+                </tr>`).join('')
+            : '<tr><td colspan="7" class="px-4 py-10 text-center text-slate-500">No entries match these filters</td></tr>';
+    }
+
+    // Search as you type (with a short pause), and immediately when a dropdown or date changes.
+    let typingTimer;
+    document.getElementById('q').addEventListener('input', () => {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(load, 300);
+    });
+    document.getElementById('status').addEventListener('change', load);
+    document.getElementById('date').addEventListener('change', load);
+    document.getElementById('clear').addEventListener('click', () => {
+        fields.forEach(f => f.value = '');
+        load();
+    });
+    document.getElementById('filters').addEventListener('submit', e => { e.preventDefault(); load(); });
+
+    load();
+</script>
+{% endblock %}

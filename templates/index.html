@@ -1,160 +1,239 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UMPSA ALPR Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-900 text-white font-sans">
-    <div class="container mx-auto px-4 py-8">
-        <!-- Header -->
-        <header class="mb-8 border-b border-gray-700 pb-4">
-            <h1 class="text-3xl font-bold text-blue-400">UMPSA Campus Gate Security</h1>
-            <p class="text-gray-400">Edge-AI Automated License Plate Recognition</p>
-        </header>
+{% extends "base.html" %}
 
-        <div class="flex flex-col lg:flex-row gap-8">
-            <!-- Left Column: Live Video Feed -->
-            <div class="flex-1">
-                <div class="bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700">
-                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-                        <h2 id="source-label" class="text-xl font-semibold">{{ source_label }}</h2>
-                        <div class="flex gap-2 shrink-0">
-                            <input id="video-file" type="file" accept="video/*" class="hidden">
-                            <button id="upload-video" class="bg-green-600 hover:bg-green-500 disabled:opacity-50 px-4 py-2 rounded font-semibold">
-                                Upload video &#8679;
-                            </button>
-                            <button id="next-video" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-semibold">
-                                Next video &#9654;
-                            </button>
-                        </div>
-                    </div>
-                    <!-- Upload progress, hidden until a file is chosen -->
-                    <div id="upload-status" class="hidden mb-4">
-                        <div class="w-full bg-gray-700 rounded h-2">
-                            <div id="upload-bar" class="bg-green-500 h-2 rounded" style="width: 0%"></div>
-                        </div>
-                        <p id="upload-text" class="text-sm text-gray-300 mt-1"></p>
-                    </div>
-                    <!-- This img tag continuously loads the MJPEG stream from Flask -->
-                    <img src="/video_feed" class="w-full rounded border border-gray-600" alt="Live Camera Feed">
-                </div>
-            </div>
+{% block title %}Live Monitor · UMPSA Gate ALPR{% endblock %}
 
-            <!-- Right Column: Status & Logs -->
-            <div class="w-full lg:w-1/3 flex flex-col gap-6">
-                <!-- Live Status Banner -->
-                <div id="status-banner" class="rounded-lg p-6 shadow-lg text-center border-2 border-gray-600 bg-gray-800 transition-colors duration-300">
-                    <h2 class="text-sm uppercase tracking-wide text-gray-300 mb-1">Current Scan</h2>
-                    <p id="status-text" class="text-2xl font-bold">Scanning...</p>
-                </div>
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
 
-                <!-- Database Entry Logs -->
-                <div class="bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700 flex-1">
-                    <h2 class="text-xl mb-4 font-semibold">Recent Entries</h2>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-gray-700 text-gray-300">
-                                <tr>
-                                    <th class="p-2 rounded-tl">Time</th>
-                                    <th class="p-2">Plate</th>
-                                    <th class="p-2 rounded-tr">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="log-table-body">
-                                <!-- JavaScript will inject rows here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+{% block content %}
+<!-- Welcome banner: who just came through the gate -->
+<section id="welcome" class="rounded-2xl p-6 md:p-8 mb-6 border transition-colors duration-500 bg-slate-900 border-slate-800">
+    <p id="welcome-kicker" class="text-xs uppercase tracking-widest text-slate-400">Gate status</p>
+    <h2 id="welcome-title" class="text-3xl md:text-5xl font-bold mt-1">Waiting for the next vehicle</h2>
+    <p id="welcome-detail" class="text-lg md:text-2xl mt-2 text-slate-300">{{ faculty }}</p>
+</section>
+
+<!-- Today at a glance -->
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Entries today</p>
+        <p id="stat-total" class="text-3xl font-bold mt-1">0</p>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs uppercase tracking-wide text-emerald-400">Registered</p>
+        <p id="stat-registered" class="text-3xl font-bold mt-1">0</p>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs uppercase tracking-wide text-amber-400">Visitors</p>
+        <p id="stat-visitors" class="text-3xl font-bold mt-1">0</p>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Unique vehicles</p>
+        <p id="stat-unique" class="text-3xl font-bold mt-1">0</p>
+    </div>
+</section>
+
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 lg:items-start">
+    <!-- Camera / video -->
+    <div class="lg:col-span-2 rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h3 id="source-label" class="font-semibold text-slate-200">{{ source_label }}</h3>
+            <div class="flex gap-2">
+                <input id="video-file" type="file" accept="video/*" class="hidden">
+                <button id="upload-video" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-3 py-1.5 rounded text-sm font-semibold">
+                    Upload video &#8679;
+                </button>
+                <button id="next-video" class="bg-sky-600 hover:bg-sky-500 px-3 py-1.5 rounded text-sm font-semibold">
+                    Next video &#9654;
+                </button>
             </div>
         </div>
+        <!-- Upload progress, hidden until a file is chosen -->
+        <div id="upload-status" class="hidden mb-3">
+            <div class="w-full bg-slate-700 rounded h-2">
+                <div id="upload-bar" class="bg-emerald-500 h-2 rounded" style="width: 0%"></div>
+            </div>
+            <p id="upload-text" class="text-sm text-slate-300 mt-1"></p>
+        </div>
+        <!-- This img tag continuously loads the MJPEG stream from Flask -->
+        <img src="/video_feed" class="w-full rounded-lg border border-slate-700" alt="Live gate camera">
     </div>
 
-    <script>
-        document.getElementById('next-video').addEventListener('click', () => fetch('/api/next', { method: 'POST' }));
+    <!-- Latest entries -->
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-slate-200">Latest entries</h3>
+            <a href="/records" class="text-sm text-sky-400 hover:underline">All records &rarr;</a>
+        </div>
+        <ul id="latest" class="divide-y divide-slate-800 flex-1 max-h-[26rem] overflow-y-auto pr-1">
+            <li class="py-6 text-center text-slate-500 text-sm">No entries yet</li>
+        </ul>
+    </div>
+</section>
 
-        // Upload: XMLHttpRequest instead of fetch so we can show upload progress for big videos.
-        const fileInput = document.getElementById('video-file');
-        const uploadButton = document.getElementById('upload-video');
-        uploadButton.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', () => {
-            const file = fileInput.files[0];
-            if (!file) return;
-            const bar = document.getElementById('upload-bar');
-            const text = document.getElementById('upload-text');
-            document.getElementById('upload-status').classList.remove('hidden');
-            uploadButton.disabled = true;
+<!-- Traffic by hour -->
+<section class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+    <h3 class="font-semibold text-slate-200 mb-3">Entries by hour (today)</h3>
+    <div class="h-64"><canvas id="hourly-chart"></canvas></div>
+</section>
 
-            const form = new FormData();
-            form.append('video', file);
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/upload');
-            xhr.upload.onprogress = (e) => {
-                const percent = Math.round((e.loaded / e.total) * 100);
-                bar.style.width = percent + '%';
-                text.innerText = `Uploading ${file.name}... ${percent}%`;
-            };
-            const finish = (message, ok) => {
-                text.innerText = message;
-                text.className = 'text-sm mt-1 ' + (ok ? 'text-gray-300' : 'text-red-400');
-                uploadButton.disabled = false;
-                fileInput.value = '';
-                if (ok) setTimeout(() => document.getElementById('upload-status').classList.add('hidden'), 4000);
-            };
-            xhr.onload = () => {
-                if (xhr.status === 200) return finish(`Playing ${file.name}`, true);
-                let error;
-                try { error = JSON.parse(xhr.responseText).error; } catch (e) { /* not JSON */ }
-                finish(`Upload failed: ${error || 'server error ' + xhr.status}`, false);
-            };
-            xhr.onerror = () => finish(
-                'Upload failed: lost connection to the dashboard. Is app.py still running?', false);
-            xhr.send(form);
-        });
+<p id="db-error" class="hidden fixed bottom-4 right-4 bg-red-600 text-white text-sm px-4 py-2 rounded shadow-lg"></p>
+{% endblock %}
 
-        // Poll the Python API every 1 second to get the latest DB logs and UI status
-        setInterval(() => {
-            fetch('/api/data')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        document.getElementById('status-text').innerText = data.error;
-                        return;
-                    }
-                    document.getElementById('source-label').innerText = data.source_label;
-                    // Update Status Banner
-                    const banner = document.getElementById('status-banner');
-                    const statusText = document.getElementById('status-text');
-                    statusText.innerText = data.status_text;
-                    
-                    if (data.status_color === "green") {
-                        banner.className = "rounded-lg p-6 shadow-lg text-center border-2 border-green-500 bg-green-900/50";
-                    } else if (data.status_color === "red") {
-                        banner.className = "rounded-lg p-6 shadow-lg text-center border-2 border-red-500 bg-red-900/50";
-                    } else {
-                        banner.className = "rounded-lg p-6 shadow-lg text-center border-2 border-gray-600 bg-gray-800";
-                    }
+{% block scripts %}
+<script>
+    // --- Video controls ---
+    document.getElementById('next-video').addEventListener('click', () => fetch('/api/next', { method: 'POST' }));
 
-                    // Update Table
-                    const tbody = document.getElementById('log-table-body');
-                    tbody.innerHTML = '';
-                    data.logs.forEach(log => {
-                        const statusBadge = log.status === 'Registered' 
-                            ? `<span class="bg-green-600 px-2 py-1 rounded text-xs">Registered</span>`
-                            : `<span class="bg-red-600 px-2 py-1 rounded text-xs">Visitor</span>`;
-                        
-                        tbody.innerHTML += `
-                            <tr class="border-b border-gray-700">
-                                <td class="p-2 text-gray-400">${log.time}</td>
-                                <td class="p-2 font-mono font-bold">${log.plate}</td>
-                                <td class="p-2">${statusBadge}</td>
-                            </tr>
-                        `;
-                    });
-                });
-        }, 1000);
-    </script>
-</body>
-</html>
+    // Upload: XMLHttpRequest instead of fetch so we can show upload progress for big videos.
+    const fileInput = document.getElementById('video-file');
+    const uploadButton = document.getElementById('upload-video');
+    uploadButton.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const bar = document.getElementById('upload-bar');
+        const text = document.getElementById('upload-text');
+        document.getElementById('upload-status').classList.remove('hidden');
+        uploadButton.disabled = true;
+
+        const form = new FormData();
+        form.append('video', file);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/upload');
+        xhr.upload.onprogress = (e) => {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            bar.style.width = percent + '%';
+            text.innerText = `Uploading ${file.name}... ${percent}%`;
+        };
+        const finish = (message, ok) => {
+            text.innerText = message;
+            text.className = 'text-sm mt-1 ' + (ok ? 'text-slate-300' : 'text-red-400');
+            uploadButton.disabled = false;
+            fileInput.value = '';
+            if (ok) setTimeout(() => document.getElementById('upload-status').classList.add('hidden'), 4000);
+        };
+        xhr.onload = () => {
+            if (xhr.status === 200) return finish(`Playing ${file.name}`, true);
+            let error;
+            try { error = JSON.parse(xhr.responseText).error; } catch (e) { /* not JSON */ }
+            finish(`Upload failed: ${error || 'server error ' + xhr.status}`, false);
+        };
+        xhr.onerror = () => finish(
+            'Upload failed: lost connection to the dashboard. Is app.py still running?', false);
+        xhr.send(form);
+    });
+
+    // --- Welcome banner ---
+    const BANNER_BASE = 'rounded-2xl p-6 md:p-8 mb-6 border transition-colors duration-500 ';
+    const KICKER_BASE = 'text-xs uppercase tracking-widest font-semibold ';
+    const DETAIL_BASE = 'text-lg md:text-2xl mt-2 font-mono tracking-wide ';
+    function showWelcome(entry, faculty) {
+        const banner = document.getElementById('welcome');
+        const kicker = document.getElementById('welcome-kicker');
+        const title = document.getElementById('welcome-title');
+        const detail = document.getElementById('welcome-detail');
+
+        if (!entry) {
+            banner.className = BANNER_BASE + 'bg-slate-900 border-slate-800';
+            kicker.className = KICKER_BASE + 'text-slate-400';
+            detail.className = DETAIL_BASE + 'text-slate-300';
+            kicker.textContent = 'Gate status';
+            title.textContent = 'Waiting for the next vehicle';
+            detail.textContent = faculty;
+        } else if (entry.status === 'Registered') {
+            banner.className = BANNER_BASE + 'bg-gradient-to-r from-emerald-700 to-emerald-900 border-emerald-500';
+            kicker.className = KICKER_BASE + 'text-emerald-100';
+            detail.className = DETAIL_BASE + 'text-white';
+            kicker.textContent = `Registered ${entry.category || 'vehicle'} · ${entry.time}`;
+            title.textContent = `Welcome, ${entry.name}`;
+            detail.textContent = `${entry.plate} to ${faculty}`;
+        } else {
+            banner.className = BANNER_BASE + 'bg-gradient-to-r from-amber-600 to-amber-800 border-amber-400';
+            kicker.className = KICKER_BASE + 'text-amber-50';
+            detail.className = DETAIL_BASE + 'text-white';
+            kicker.textContent = `Unregistered vehicle · ${entry.time}`;
+            title.textContent = 'Welcome Visitor';
+            detail.textContent = `${entry.plate} to ${faculty}`;
+        }
+    }
+
+    // --- Latest entries list ---
+    function showLatest(logs) {
+        const list = document.getElementById('latest');
+        if (!logs.length) {
+            list.innerHTML = '<li class="py-6 text-center text-slate-500 text-sm">No entries yet</li>';
+            return;
+        }
+        list.innerHTML = logs.map(log => `
+            <li class="py-2.5 flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="font-mono font-bold tracking-wide">${esc(log.plate)}</p>
+                    <p class="text-sm text-slate-400 truncate">
+                        ${log.name ? `${esc(log.name)} &middot; ${esc(log.category || '')}` : 'Visitor'}
+                    </p>
+                </div>
+                <div class="text-right shrink-0">
+                    ${statusBadge(log.status)}
+                    <p class="text-xs text-slate-500 mt-1">${esc(log.date)} ${esc(log.time)}</p>
+                </div>
+            </li>`).join('');
+    }
+
+    // --- Hourly chart ---
+    const hourlyChart = new Chart(document.getElementById('hourly-chart'), {
+        type: 'bar',
+        data: {
+            labels: Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00'),
+            datasets: [
+                { label: 'Registered', data: Array(24).fill(0), backgroundColor: '#10b981' },
+                { label: 'Visitor', data: Array(24).fill(0), backgroundColor: '#f59e0b' },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { display: false } },
+                y: { stacked: true, beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#1e293b' } },
+            },
+            plugins: { legend: { labels: { color: '#cbd5e1' } } },
+        },
+    });
+    let lastHourly = '';
+    function showHourly(hourly) {
+        const key = JSON.stringify(hourly);
+        if (key === lastHourly) return;  // only redraw when the numbers change
+        lastHourly = key;
+        hourlyChart.data.datasets[0].data = hourly.Registered;
+        hourlyChart.data.datasets[1].data = hourly.Visitor;
+        hourlyChart.update();
+    }
+
+    // --- Poll the server every second ---
+    async function refresh() {
+        const errorBox = document.getElementById('db-error');
+        try {
+            const data = await (await fetch('/api/data')).json();
+            if (data.error) throw new Error(data.error);
+            errorBox.classList.add('hidden');
+
+            document.getElementById('source-label').textContent = data.source_label;
+            showWelcome(data.welcome, data.faculty);
+            showLatest(data.logs);
+            document.getElementById('stat-total').textContent = data.summary.total;
+            document.getElementById('stat-registered').textContent = data.summary.registered;
+            document.getElementById('stat-visitors').textContent = data.summary.visitors;
+            document.getElementById('stat-unique').textContent = data.summary.unique_vehicles;
+            showHourly(data.hourly);
+        } catch (e) {
+            errorBox.textContent = e.message || 'Lost connection to the dashboard';
+            errorBox.classList.remove('hidden');
+        }
+    }
+    refresh();
+    setInterval(refresh, 1000);
+</script>
+{% endblock %}

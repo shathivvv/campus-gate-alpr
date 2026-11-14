@@ -26,6 +26,22 @@ video / webcam ──► YOLO plate detector ──► plate crop ──► Padd
 - **Real-time video playback:** recorded footage plays at its real speed. When detection falls
   behind, frames are skipped, just as a live gate camera would drop them.
 
+## Dashboard
+
+**Live Monitor** (`/`)
+- Welcome banner for each vehicle: *"Welcome, (owner name) / ABC1234 to Fakulti Komputeran"* in green
+  for registered vehicles, *"Welcome Visitor"* in amber otherwise. It clears after 8 seconds.
+- Today at a glance: total entries, registered, visitors, unique vehicles.
+- Live video with plate boxes, the latest entries with owner name and category, and
+  an entries-per-hour chart.
+
+**Records** (`/records`)
+- Search by plate or owner name, filter by status and date.
+- Export the filtered entries to CSV.
+
+The faculty name and banner duration are set in `config.py`
+(`ALPR_FACULTY_NAME`, `ALPR_WELCOME_SECONDS`).
+
 ## Setup
 
 ```bash
