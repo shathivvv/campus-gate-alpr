@@ -46,3 +46,15 @@ def test_near_duplicate():
     assert is_near_duplicate("JQR905", "JQR9105")
     assert not is_near_duplicate("BKL5678C", "PLM4321")
     assert not is_near_duplicate("ABC1234", "ABC9934")
+
+def test_expired_plates_are_removed_from_last_logged():
+    voter = PlateVoter(min_votes=1, cooldown=15.0)
+
+    # Confirm the first car
+    voter.add("WA1234B", 0.9, now=0.0)
+
+    # A different car arrives after the cooldown
+    voter.add("VCD123", 0.9, now=20.0)
+
+    # The old plate should no longer be stored
+    assert "WA1234B" not in voter.last_logged
