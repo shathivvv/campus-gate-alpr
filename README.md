@@ -1,5 +1,7 @@
 # UMPSA Campus Gate ALPR
 
+[![tests](https://github.com/shathivvv/campus-gate-alpr/actions/workflows/tests.yml/badge.svg)](https://github.com/shathivvv/campus-gate-alpr/actions/workflows/tests.yml)
+
 Automatic license plate recognition for a campus gate. It finds Malaysian plates in a live
 camera or recorded video, reads them, checks them against a registry of staff and student
 vehicles, and logs each entry to a live web dashboard.
